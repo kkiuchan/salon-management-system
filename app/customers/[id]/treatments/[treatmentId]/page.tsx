@@ -8,17 +8,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { TreatmentWithImages } from "@/types";
 import {
   ArrowLeft,
   Calendar,
-  Camera,
   Clock,
   DollarSign,
-  Image as ImageIcon,
+  Edit,
+  Save,
   Scissors,
+  Trash2,
   Upload,
   User,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
@@ -32,7 +45,21 @@ export default function TreatmentDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 編集関連の状態
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editData, setEditData] = useState({
+    date: "",
+    menu: "",
+    stylist_name: "",
+    price: 0,
+    duration: 0,
+    notes: "",
+  });
 
   useEffect(() => {
     if (params.treatmentId) {
@@ -51,6 +78,15 @@ export default function TreatmentDetailPage() {
         );
         if (treatmentData) {
           setTreatment(treatmentData);
+          // 編集データを初期化
+          setEditData({
+            date: treatmentData.date || "",
+            menu: treatmentData.menu || "",
+            stylist_name: treatmentData.stylist_name || "",
+            price: treatmentData.price || 0,
+            duration: treatmentData.duration || 0,
+            notes: treatmentData.notes || "",
+          });
         }
       }
     } catch (error) {
@@ -219,9 +255,102 @@ export default function TreatmentDetailPage() {
     }
   };
 
-  const handleCameraCapture = () => {
+  const handleImageAdd = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  // 施術更新処理
+  const handleUpdateTreatment = async () => {
+    if (!treatment) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/treatments/${treatment.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editData),
+      });
+
+      if (response.ok) {
+        const updatedTreatment = await response.json();
+        setTreatment(updatedTreatment);
+        setIsEditing(false);
+        alert("施術情報を更新しました");
+      } else {
+        const error = await response.json();
+        alert(`更新に失敗しました: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("施術の更新に失敗しました:", error);
+      alert("更新エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 施術削除処理
+  const handleDeleteTreatment = async () => {
+    if (!treatment) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/treatments/${treatment.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        alert("施術を削除しました");
+        router.push(`/customers/${params.id}`);
+      } else {
+        const error = await response.json();
+        alert(`削除に失敗しました: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("施術の削除に失敗しました:", error);
+      alert("削除エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+  // 画像削除処理
+  const handleDeleteImage = async (imageId: string) => {
+    if (confirm("この画像を削除しますか？この操作は取り消せません。")) {
+      setDeletingImageId(imageId);
+      try {
+        const response = await fetch(
+          `/api/treatments/${params.treatmentId}/images/${imageId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (response.ok) {
+          setTreatment((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  treatment_images: prev.treatment_images.filter(
+                    (img) => img.id !== imageId
+                  ),
+                }
+              : null
+          );
+        } else {
+          const error = await response.json();
+          alert(`削除に失敗しました: ${error.error}`);
+        }
+      } catch (error) {
+        console.error("画像の削除に失敗しました:", error);
+        alert("削除エラーが発生しました");
+      } finally {
+        setDeletingImageId(null);
+      }
     }
   };
 
@@ -261,18 +390,105 @@ export default function TreatmentDetailPage() {
       {/* ヘッダー */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-8">
-          <div className="flex items-center h-14 sm:h-16">
-            <Button
-              variant="ghost"
-              onClick={() => router.push(`/customers/${params.id}`)}
-              className="mr-4"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              戻る
-            </Button>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">
-              施術詳細
-            </h1>
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                onClick={() => router.push(`/customers/${params.id}`)}
+                className="mr-4"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                戻る
+              </Button>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">
+                施術詳細
+              </h1>
+            </div>
+
+            {/* アクションボタン */}
+            <div className="flex items-center gap-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    onClick={handleUpdateTreatment}
+                    disabled={submitting}
+                    size="sm"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    保存
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditing(false);
+                      // 編集データをリセット
+                      setEditData({
+                        date: treatment.date || "",
+                        menu: treatment.menu || "",
+                        stylist_name: treatment.stylist_name || "",
+                        price: treatment.price || 0,
+                        duration: treatment.duration || 0,
+                        notes: treatment.notes || "",
+                      });
+                    }}
+                    size="sm"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    キャンセル
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditing(true)}
+                    size="sm"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    編集
+                  </Button>
+                  <Dialog
+                    open={isDeleteDialogOpen}
+                    onOpenChange={setIsDeleteDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        削除
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>施術の削除</DialogTitle>
+                        <DialogDescription>
+                          この施術を削除しますか？この操作は取り消せません。
+                          関連する画像もすべて削除されます。
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsDeleteDialogOpen(false)}
+                        >
+                          キャンセル
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={handleDeleteTreatment}
+                          disabled={submitting}
+                        >
+                          {submitting ? "削除中..." : "削除"}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -286,50 +502,144 @@ export default function TreatmentDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Scissors className="h-5 w-5" />
-                  {treatment.menu}
+                  {isEditing ? "施術情報を編集" : treatment.menu}
                 </CardTitle>
-                <CardDescription>
-                  {formatDate(treatment.date)} の施術
-                </CardDescription>
+                {!isEditing && (
+                  <CardDescription>
+                    {formatDate(treatment.date)} の施術
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <span>スタイリスト: {treatment.stylist_name}</span>
+                {isEditing ? (
+                  // 編集フォーム
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="date">施術日 *</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={editData.date}
+                          onChange={(e) =>
+                            setEditData({ ...editData, date: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="menu">メニュー *</Label>
+                        <Input
+                          id="menu"
+                          value={editData.menu}
+                          onChange={(e) =>
+                            setEditData({ ...editData, menu: e.target.value })
+                          }
+                          placeholder="例: カット + カラー"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="stylist_name">スタイリスト *</Label>
+                        <Input
+                          id="stylist_name"
+                          value={editData.stylist_name}
+                          onChange={(e) =>
+                            setEditData({
+                              ...editData,
+                              stylist_name: e.target.value,
+                            })
+                          }
+                          placeholder="担当スタイリスト名"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="price">料金</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={editData.price}
+                          onChange={(e) =>
+                            setEditData({
+                              ...editData,
+                              price: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="duration">施術時間（分）</Label>
+                        <Input
+                          id="duration"
+                          type="number"
+                          value={editData.duration}
+                          onChange={(e) =>
+                            setEditData({
+                              ...editData,
+                              duration: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="notes">備考</Label>
+                      <Textarea
+                        id="notes"
+                        value={editData.notes}
+                        onChange={(e) =>
+                          setEditData({ ...editData, notes: e.target.value })
+                        }
+                        placeholder="施術に関する備考があれば記入してください"
+                        rows={3}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span>日付: {formatDate(treatment.date)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-gray-500" />
-                    <span>料金: ¥{treatment.price?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span>施術時間: {treatment.duration}分</span>
-                  </div>
-                </div>
-                {treatment.notes && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700">{treatment.notes}</p>
+                ) : (
+                  // 表示モード
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-500" />
+                      <span>スタイリスト: {treatment.stylist_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span>日付: {formatDate(treatment.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-gray-500" />
+                      <span>料金: ¥{treatment.price?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span>施術時間: {treatment.duration}分</span>
+                    </div>
+                    {treatment.notes && (
+                      <div className="md:col-span-2 mt-4 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-700">
+                          {treatment.notes}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* 画像アップロード - iOS対応改善版 */}
+          {/* 画像アップロード - シンプル版 */}
           <div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="h-5 w-5" />
-                  画像アップロード
+                  画像管理
                 </CardTitle>
                 <CardDescription>
-                  施術の画像をアップロードできます（iOS/Android対応）
+                  施術の画像をアップロード・管理できます
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -339,39 +649,21 @@ export default function TreatmentDetailPage() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment" // iOS/Androidのカメラを優先
                     onChange={handleFileSelect}
                     className="hidden"
                   />
 
-                  {/* アップロードボタン（iOS対応） */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCameraCapture}
-                      className="flex-1 h-12 text-base"
-                      disabled={uploading}
-                    >
-                      <Camera className="h-5 w-5 mr-2" />
-                      写真を撮影
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (fileInputRef.current) {
-                          fileInputRef.current.removeAttribute("capture");
-                          fileInputRef.current.click();
-                        }
-                      }}
-                      className="flex-1 h-12 text-base"
-                      disabled={uploading}
-                    >
-                      <ImageIcon className="h-5 w-5 mr-2" />
-                      ギャラリーから選択
-                    </Button>
-                  </div>
+                  {/* シンプルなアップロードボタン */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleImageAdd}
+                    className="w-full h-12 text-base"
+                    disabled={uploading}
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    画像を追加
+                  </Button>
 
                   <p className="text-xs text-gray-500 text-center">
                     JPEG、PNG、WebP、HEIC形式対応 / 最大10MBまで
@@ -458,8 +750,24 @@ export default function TreatmentDetailPage() {
                           sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                         />
                       </div>
-                      <div className="mt-2 text-xs text-gray-500 text-center">
-                        {formatDateTime(image.created_at)}
+                      <div className="mt-2 space-y-2">
+                        <div className="text-xs text-gray-500 text-center">
+                          {formatDateTime(image.created_at)}
+                        </div>
+                        <div className="flex justify-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteImage(image.id)}
+                            disabled={deletingImageId === image.id}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            {deletingImageId === image.id
+                              ? "削除中..."
+                              : "削除"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}

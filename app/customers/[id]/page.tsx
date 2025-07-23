@@ -42,6 +42,7 @@ import {
   Phone,
   Plus,
   Scissors,
+  Trash2,
   User,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -72,6 +73,12 @@ export default function CustomerDetailPage() {
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // 削除機能用の状態
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [treatmentToDelete, setTreatmentToDelete] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (params.id) {
@@ -335,6 +342,40 @@ export default function CustomerDetailPage() {
     }
   };
 
+  // 施術削除機能
+  const handleDeleteTreatment = async () => {
+    if (!treatmentToDelete) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/treatments/${treatmentToDelete}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // 顧客データを再取得して表示を更新
+        await fetchCustomer();
+        alert("施術を削除しました");
+      } else {
+        const error = await response.json();
+        alert(`削除に失敗しました: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("施術の削除に失敗しました:", error);
+      alert("削除エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+      setDeleteDialogOpen(false);
+      setTreatmentToDelete(null);
+    }
+  };
+
+  // 削除ダイアログを開く
+  const openDeleteDialog = (treatmentId: string) => {
+    setTreatmentToDelete(treatmentId);
+    setDeleteDialogOpen(true);
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
     return new Date(dateString).toLocaleDateString("ja-JP");
@@ -413,7 +454,7 @@ export default function CustomerDetailPage() {
                         <Edit className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>顧客情報編集</DialogTitle>
                         <DialogDescription>
@@ -580,7 +621,7 @@ export default function CustomerDetailPage() {
                         施術追加
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>新規施術追加</DialogTitle>
                         <DialogDescription>
@@ -695,47 +736,27 @@ export default function CustomerDetailPage() {
                             id="treatment-images"
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             multiple
                             onChange={handleImageSelect}
                             className="hidden"
                           />
 
-                          {/* アップロードボタン（iOS対応） */}
-                          <div className="mt-2 flex flex-col sm:flex-row gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                const input = document.getElementById(
-                                  "treatment-images"
-                                ) as HTMLInputElement;
-                                if (input) {
-                                  input.setAttribute("capture", "environment");
-                                  input.click();
-                                }
-                              }}
-                              className="flex-1 h-10 text-sm"
-                            >
-                              📷 写真を撮影
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                const input = document.getElementById(
-                                  "treatment-images"
-                                ) as HTMLInputElement;
-                                if (input) {
-                                  input.removeAttribute("capture");
-                                  input.click();
-                                }
-                              }}
-                              className="flex-1 h-10 text-sm"
-                            >
-                              🖼️ ギャラリーから選択
-                            </Button>
-                          </div>
+                          {/* シンプルなアップロードボタン */}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              const input = document.getElementById(
+                                "treatment-images"
+                              ) as HTMLInputElement;
+                              if (input) {
+                                input.click();
+                              }
+                            }}
+                            className="w-full h-10 text-sm mt-2"
+                          >
+                            📷 画像を追加
+                          </Button>
 
                           <p className="text-xs text-gray-500 mt-2 text-center">
                             JPEG、PNG、WebP、HEIC形式対応 / 最大10MBまで
@@ -853,7 +874,7 @@ export default function CustomerDetailPage() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex justify-end">
+                              <div className="flex justify-end gap-2">
                                 <Button
                                   variant="outline"
                                   onClick={() =>
@@ -862,7 +883,15 @@ export default function CustomerDetailPage() {
                                     )
                                   }
                                 >
-                                  画像を見る・追加
+                                  詳細・編集
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => openDeleteDialog(treatment.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  削除
                                 </Button>
                               </div>
                             </div>
@@ -918,6 +947,34 @@ export default function CustomerDetailPage() {
             </Card>
           </div>
         </div>
+
+        {/* 削除確認ダイアログ */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>施術の削除</DialogTitle>
+              <DialogDescription>
+                この施術を削除しますか？この操作は取り消せません。
+                関連する画像もすべて削除されます。
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                キャンセル
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteTreatment}
+                disabled={submitting}
+              >
+                {submitting ? "削除中..." : "削除"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
