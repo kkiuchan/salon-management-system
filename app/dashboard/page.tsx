@@ -31,19 +31,24 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Download,
   Edit,
   Filter,
   LogOut,
   Mail,
   Phone,
   Plus,
+  Printer,
+  QrCode,
   Shield,
   Trash2,
   User,
+  Users,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import QRCode from "react-qr-code";
 import { useAuth } from "../providers";
 
 export default function DashboardPage() {
@@ -84,7 +89,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   // 新しいタブ管理の状態
-  const [activeTab, setActiveTab] = useState<"customers" | "admins">(
+  const [activeTab, setActiveTab] = useState<"customers" | "admins" | "qrcode">(
     "customers"
   );
 
@@ -130,6 +135,106 @@ export default function DashboardPage() {
     return new Date(
       Math.max(...treatments.map((t) => new Date(t.date).getTime()))
     );
+  };
+
+  // QRコード関連の状態
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [qrCodeData, setQRCodeData] = useState({
+    url: "",
+    title: "",
+    description: "",
+  });
+
+  // QRコード印刷機能
+  const handlePrintQR = (
+    url: string,
+    title: string,
+    description: string = ""
+  ) => {
+    setQRCodeData({ url, title, description });
+    setShowQRDialog(true);
+  };
+
+  const printQRCode = () => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>QRコード - ${qrCodeData.title}</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                padding: 20px;
+                box-sizing: border-box;
+              }
+              .qr-container {
+                text-align: center;
+                max-width: 400px;
+              }
+              .qr-code {
+                border: 20px solid white;
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                margin: 20px 0;
+              }
+              .title {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #333;
+              }
+              .description {
+                font-size: 16px;
+                color: #666;
+                margin-bottom: 20px;
+                line-height: 1.5;
+              }
+              .url {
+                font-size: 12px;
+                color: #999;
+                word-break: break-all;
+                margin-top: 20px;
+              }
+              @media print {
+                body { margin: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="qr-container">
+              <div class="title">${qrCodeData.title}</div>
+              ${
+                qrCodeData.description
+                  ? `<div class="description">${qrCodeData.description}</div>`
+                  : ""
+              }
+              <div class="qr-code">
+                <svg width="200" height="200" viewBox="0 0 200 200">
+                  <!-- QRコードは実際のライブラリで生成される -->
+                </svg>
+              </div>
+              <div class="url">${qrCodeData.url}</div>
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  window.close();
+                }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   useEffect(() => {
@@ -306,7 +411,7 @@ export default function DashboardPage() {
   };
 
   // タブ切り替え時のデータ取得
-  const handleTabChange = (tab: "customers" | "admins") => {
+  const handleTabChange = (tab: "customers" | "admins" | "qrcode") => {
     setActiveTab(tab);
     if (tab === "admins" && admins.length === 0) {
       fetchAdmins();
@@ -578,6 +683,17 @@ export default function DashboardPage() {
               >
                 <Shield className="h-4 w-4 inline mr-2" />
                 管理者管理
+              </button>
+              <button
+                onClick={() => handleTabChange("qrcode")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "qrcode"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <QrCode className="h-4 w-4 inline mr-2" />
+                顧客QRコード
               </button>
             </nav>
           </div>
@@ -1195,7 +1311,7 @@ export default function DashboardPage() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === "admins" ? (
           // 管理者管理コンテンツ
           <div className="space-y-6">
             {/* 管理者管理ヘッダー */}
@@ -1464,6 +1580,211 @@ export default function DashboardPage() {
                     </div>
                   </form>
                 )}
+              </DialogContent>
+            </Dialog>
+          </div>
+        ) : (
+          // 顧客QRコード管理コンテンツ
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  顧客QRコード管理
+                </h2>
+                <p className="text-sm text-gray-600">
+                  新規顧客入力ページと既存顧客のQRコードを管理
+                </p>
+              </div>
+            </div>
+
+            {/* 新規顧客入力用QRコード */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
+                  新規顧客情報入力用QRコード
+                </CardTitle>
+                <CardDescription>
+                  初回来店のお客様に提示するQRコードです
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col items-center">
+                    <div className="bg-white p-4 rounded-lg border-2">
+                      <QRCode
+                        value={`${
+                          typeof window !== "undefined"
+                            ? window.location.origin
+                            : ""
+                        }/customer-register`}
+                        size={200}
+                        bgColor="white"
+                        fgColor="black"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2 text-center">
+                      新規顧客情報入力ページ
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">
+                        使用方法
+                      </h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• 受付にこのQRコードを印刷して配置</li>
+                        <li>• 初回来店のお客様にスマホで読み取ってもらう</li>
+                        <li>• お客様が自分で基本情報を入力</li>
+                        <li>• 入力完了後、ダッシュボードで確認可能</li>
+                      </ul>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() =>
+                          handlePrintQR(
+                            `${
+                              typeof window !== "undefined"
+                                ? window.location.origin
+                                : ""
+                            }/customer-register`,
+                            "新規顧客情報入力",
+                            "初回来店のお客様は\nこちらのQRコードを読み取って\n基本情報をご入力ください"
+                          )
+                        }
+                        className="flex-1"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        印刷用表示
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const url = `${
+                            typeof window !== "undefined"
+                              ? window.location.origin
+                              : ""
+                          }/customer-register`;
+                          navigator.clipboard.writeText(url);
+                          alert("URLをコピーしました");
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        URLコピー
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 既存顧客用QRコード */}
+            <Card>
+              <CardHeader>
+                <CardTitle>既存顧客詳細用QRコード</CardTitle>
+                <CardDescription>
+                  既存顧客の詳細ページへのQRコードを生成
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {paginatedCustomers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedCustomers.slice(0, 6).map((customer) => (
+                        <Card key={customer.id} className="p-4">
+                          <div className="text-center">
+                            <div className="bg-white p-2 rounded border inline-block mb-2">
+                              <QRCode
+                                value={`${
+                                  typeof window !== "undefined"
+                                    ? window.location.origin
+                                    : ""
+                                }/customers/${customer.id}`}
+                                size={100}
+                                bgColor="white"
+                                fgColor="black"
+                              />
+                            </div>
+                            <h4 className="font-medium text-sm text-gray-900 truncate">
+                              {customer.name}
+                            </h4>
+                            <p className="text-xs text-gray-500 mb-2">
+                              顧客詳細ページ
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handlePrintQR(
+                                  `${
+                                    typeof window !== "undefined"
+                                      ? window.location.origin
+                                      : ""
+                                  }/customers/${customer.id}`,
+                                  `${customer.name}様 詳細情報`,
+                                  "施術履歴や詳細情報を\nご確認いただけます"
+                                )
+                              }
+                              className="w-full"
+                            >
+                              <Printer className="h-3 w-3 mr-1" />
+                              印刷
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">顧客が登録されていません</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* QRコード印刷ダイアログ */}
+            <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>QRコード印刷用表示</DialogTitle>
+                  <DialogDescription>
+                    下記QRコードを印刷してご利用ください
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="text-center space-y-4">
+                  <div className="bg-white p-6 rounded-lg border-2 inline-block">
+                    <QRCode
+                      value={qrCodeData.url}
+                      size={200}
+                      bgColor="white"
+                      fgColor="black"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {qrCodeData.title}
+                    </h3>
+                    {qrCodeData.description && (
+                      <p className="text-sm text-gray-600 whitespace-pre-line mt-1">
+                        {qrCodeData.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={printQRCode} className="flex-1">
+                      <Printer className="h-4 w-4 mr-2" />
+                      印刷
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowQRDialog(false)}
+                    >
+                      閉じる
+                    </Button>
+                  </div>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
