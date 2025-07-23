@@ -128,24 +128,123 @@ export default function CustomerDetailPage() {
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const validFiles = files.filter((file) => {
-      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+    const validFiles: File[] = [];
+    const processedFiles: Promise<File>[] = [];
 
-      if (!allowedTypes.includes(file.type)) {
-        alert(`${file.name}: JPEG、PNG、WebPファイルのみアップロード可能です`);
-        return false;
+    files.forEach(async (file) => {
+      // ファイル形式チェック（より柔軟に）
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "image/heif", // iOS HEIC/HEIF 対応
+      ];
+
+      // ファイル拡張子からも判定
+      const fileExtension = file.name.toLowerCase().split(".").pop();
+      const allowedExtensions = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+
+      const isValidType =
+        allowedTypes.includes(file.type) ||
+        (fileExtension && allowedExtensions.includes(fileExtension));
+
+      if (!isValidType) {
+        alert(
+          `${file.name}: JPEG、PNG、WebP、HEIC形式の画像ファイルをアップロードしてください`
+        );
+        return;
       }
 
-      if (file.size > maxSize) {
-        alert(`${file.name}: ファイルサイズは10MB以下である必要があります`);
-        return false;
-      }
+      // 大きなファイルの場合は圧縮
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB以上の場合
+        try {
+          const compressedFile = await compressImage(file);
 
-      return true;
+          const maxSize = 10 * 1024 * 1024;
+          if (compressedFile.size > maxSize) {
+            alert(
+              `${file.name}: ファイルサイズが大きすぎます。別の画像を選択してください。`
+            );
+            return;
+          }
+
+          validFiles.push(compressedFile);
+        } catch (error) {
+          alert(`${file.name}: 画像の圧縮に失敗しました`);
+        }
+      } else {
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+          alert(`${file.name}: ファイルサイズは10MB以下である必要があります`);
+          return;
+        }
+        validFiles.push(file);
+      }
     });
 
-    setSelectedImages(validFiles);
+    // 少し遅延を入れて非同期処理を待つ
+    setTimeout(() => {
+      setSelectedImages(validFiles);
+    }, 100);
+  };
+
+  // 画像圧縮関数を追加
+  const compressImage = (
+    file: File,
+    maxWidth = 1920,
+    maxHeight = 1920,
+    quality = 0.8
+  ): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new window.Image();
+
+      img.onload = () => {
+        // アスペクト比を保持しながらリサイズ
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // 画像を描画
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Blob に変換
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
   };
 
   const uploadTreatmentImages = async (treatmentId: string) => {
@@ -590,36 +689,95 @@ export default function CustomerDetailPage() {
                           <Label htmlFor="treatment-images">
                             画像（複数選択可能）
                           </Label>
-                          <Input
+
+                          {/* ファイル入力（非表示） */}
+                          <input
                             id="treatment-images"
                             type="file"
-                            accept="image/jpeg,image/png,image/webp"
+                            accept="image/*"
+                            capture="environment"
                             multiple
                             onChange={handleImageSelect}
-                            className="mt-1"
+                            className="hidden"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            JPEG、PNG、WebP形式、最大10MBまで、複数選択可能
+
+                          {/* アップロードボタン（iOS対応） */}
+                          <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                const input = document.getElementById(
+                                  "treatment-images"
+                                ) as HTMLInputElement;
+                                if (input) {
+                                  input.setAttribute("capture", "environment");
+                                  input.click();
+                                }
+                              }}
+                              className="flex-1 h-10 text-sm"
+                            >
+                              📷 写真を撮影
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                const input = document.getElementById(
+                                  "treatment-images"
+                                ) as HTMLInputElement;
+                                if (input) {
+                                  input.removeAttribute("capture");
+                                  input.click();
+                                }
+                              }}
+                              className="flex-1 h-10 text-sm"
+                            >
+                              🖼️ ギャラリーから選択
+                            </Button>
+                          </div>
+
+                          <p className="text-xs text-gray-500 mt-2 text-center">
+                            JPEG、PNG、WebP、HEIC形式対応 / 最大10MBまで
+                            <br />
+                            大きな画像は自動的に圧縮されます
                           </p>
+
                           {selectedImages.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-sm font-medium text-gray-700">
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                              <p className="text-sm font-medium text-gray-700 mb-2">
                                 選択された画像: {selectedImages.length}枚
                               </p>
-                              <div className="mt-1 space-y-1">
+                              <div className="space-y-2 max-h-32 overflow-y-auto">
                                 {selectedImages.map((file, index) => (
                                   <div
                                     key={index}
-                                    className="text-xs text-gray-600 flex items-center justify-between"
+                                    className="text-xs text-gray-600 flex items-center justify-between p-2 bg-white rounded border"
                                   >
-                                    <span>{file.name}</span>
-                                    <span>
-                                      ({(file.size / 1024 / 1024).toFixed(2)}{" "}
-                                      MB)
+                                    <span className="truncate flex-1 mr-2">
+                                      {file.name}
+                                    </span>
+                                    <span className="text-gray-400 whitespace-nowrap">
+                                      {(file.size / 1024 / 1024).toFixed(1)}MB
                                     </span>
                                   </div>
                                 ))}
                               </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedImages([]);
+                                  const input = document.getElementById(
+                                    "treatment-images"
+                                  ) as HTMLInputElement;
+                                  if (input) input.value = "";
+                                }}
+                                className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                すべてクリア
+                              </Button>
                             </div>
                           )}
                         </div>

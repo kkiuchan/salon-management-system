@@ -8,21 +8,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { TreatmentWithImages } from "@/types";
 import {
   ArrowLeft,
   Calendar,
+  Camera,
   Clock,
   DollarSign,
+  Image as ImageIcon,
   Scissors,
   Upload,
   User,
 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function TreatmentDetailPage() {
   const params = useParams();
@@ -31,6 +31,8 @@ export default function TreatmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (params.treatmentId) {
@@ -58,24 +60,117 @@ export default function TreatmentDetailPage() {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 画像を圧縮する関数
+  const compressImage = (
+    file: File,
+    maxWidth = 1920,
+    maxHeight = 1920,
+    quality = 0.8
+  ): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new window.Image();
+
+      img.onload = () => {
+        // アスペクト比を保持しながらリサイズ
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // 画像を描画
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Blob に変換
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // ファイル形式チェック
-      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-      if (!allowedTypes.includes(file.type)) {
-        alert("JPEG、PNG、WebPファイルのみアップロード可能です");
+    if (!file) return;
+
+    try {
+      // ファイル形式チェック（より柔軟に）
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "image/heif", // iOS HEIC/HEIF 対応
+      ];
+
+      // ファイル拡張子からも判定
+      const fileExtension = file.name.toLowerCase().split(".").pop();
+      const allowedExtensions = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+
+      const isValidType =
+        allowedTypes.includes(file.type) ||
+        (fileExtension && allowedExtensions.includes(fileExtension));
+
+      if (!isValidType) {
+        alert(
+          "JPEG、PNG、WebP、HEIC形式の画像ファイルをアップロードしてください"
+        );
         return;
       }
 
-      // ファイルサイズチェック（10MB）
+      // 大きなファイルの場合は圧縮
+      let processedFile = file;
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB以上の場合
+        alert("画像を圧縮しています...");
+        processedFile = await compressImage(file);
+      }
+
+      // 最終的なファイルサイズチェック（10MB）
       const maxSize = 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert("ファイルサイズは10MB以下である必要があります");
+      if (processedFile.size > maxSize) {
+        alert(
+          "ファイルサイズが大きすぎます。別の画像を選択するか、画像を小さくしてください。"
+        );
         return;
       }
 
-      setSelectedFile(file);
+      setSelectedFile(processedFile);
+
+      // プレビュー画像を作成
+      const url = URL.createObjectURL(processedFile);
+      setPreviewUrl(url);
+    } catch (error) {
+      console.error("ファイル処理エラー:", error);
+      alert("画像の処理中にエラーが発生しました");
     }
   };
 
@@ -105,12 +200,13 @@ export default function TreatmentDetailPage() {
               }
             : null
         );
+
+        // 状態をリセット
         setSelectedFile(null);
-        // ファイル入力をリセット
-        const fileInput = document.getElementById(
-          "image-upload"
-        ) as HTMLInputElement;
-        if (fileInput) fileInput.value = "";
+        setPreviewUrl("");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       } else {
         const error = await response.json();
         alert(`アップロードに失敗しました: ${error.error}`);
@@ -120,6 +216,12 @@ export default function TreatmentDetailPage() {
       alert("アップロードエラーが発生しました");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleCameraCapture = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -157,25 +259,27 @@ export default function TreatmentDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex items-center h-14 sm:h-16">
             <Button
               variant="ghost"
               onClick={() => router.push(`/customers/${params.id}`)}
               className="mr-4"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              顧客詳細に戻る
+              戻る
             </Button>
-            <h1 className="text-2xl font-bold text-gray-900">施術詳細</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">
+              施術詳細
+            </h1>
           </div>
         </div>
       </header>
 
       {/* メインコンテンツ */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <main className="max-w-4xl mx-auto py-4 sm:py-6 px-3 sm:px-4 lg:px-8">
+        <div className="space-y-6">
           {/* 施術情報 */}
           <div>
             <Card>
@@ -189,44 +293,34 @@ export default function TreatmentDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span>{formatDate(treatment.date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <span>{treatment.stylist_name}</span>
-                    </div>
-                    {treatment.duration && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span>{treatment.duration}分</span>
-                      </div>
-                    )}
-                    {treatment.price && (
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
-                        <span>¥{treatment.price.toLocaleString()}</span>
-                      </div>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <span>スタイリスト: {treatment.stylist_name}</span>
                   </div>
-
-                  {treatment.notes && (
-                    <div className="pt-4 border-t">
-                      <h4 className="font-medium mb-2">備考</h4>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                        {treatment.notes}
-                      </p>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span>日付: {formatDate(treatment.date)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-gray-500" />
+                    <span>料金: ¥{treatment.price?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span>施術時間: {treatment.duration}分</span>
+                  </div>
                 </div>
+                {treatment.notes && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-700">{treatment.notes}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* 画像アップロード */}
+          {/* 画像アップロード - iOS対応改善版 */}
           <div>
             <Card>
               <CardHeader>
@@ -235,37 +329,104 @@ export default function TreatmentDetailPage() {
                   画像アップロード
                 </CardTitle>
                 <CardDescription>
-                  施術の画像をアップロードできます
+                  施術の画像をアップロードできます（iOS/Android対応）
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="image-upload">画像ファイルを選択</Label>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={handleFileSelect}
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      JPEG、PNG、WebP形式、最大10MBまで
-                    </p>
+                  {/* ファイル入力（非表示） */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment" // iOS/Androidのカメラを優先
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {/* アップロードボタン（iOS対応） */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCameraCapture}
+                      className="flex-1 h-12 text-base"
+                      disabled={uploading}
+                    >
+                      <Camera className="h-5 w-5 mr-2" />
+                      写真を撮影
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.removeAttribute("capture");
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      className="flex-1 h-12 text-base"
+                      disabled={uploading}
+                    >
+                      <ImageIcon className="h-5 w-5 mr-2" />
+                      ギャラリーから選択
+                    </Button>
                   </div>
 
+                  <p className="text-xs text-gray-500 text-center">
+                    JPEG、PNG、WebP、HEIC形式対応 / 最大10MBまで
+                    <br />
+                    大きな画像は自動的に圧縮されます
+                  </p>
+
+                  {/* プレビューとアップロード */}
                   {selectedFile && (
                     <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{selectedFile.name}</p>
-                          <p className="text-sm text-gray-500">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        {/* プレビュー画像 */}
+                        {previewUrl && (
+                          <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                            <img
+                              src={previewUrl}
+                              alt="プレビュー"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* ファイル情報 */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
                             {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                         </div>
-                        <Button onClick={handleUpload} disabled={uploading}>
-                          {uploading ? "アップロード中..." : "アップロード"}
-                        </Button>
+
+                        {/* アップロードボタン */}
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <Button
+                            onClick={handleUpload}
+                            disabled={uploading}
+                            className="flex-1 sm:flex-none"
+                          >
+                            {uploading ? "アップロード中..." : "アップロード"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedFile(null);
+                              setPreviewUrl("");
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = "";
+                              }
+                            }}
+                            disabled={uploading}
+                          >
+                            キャンセル
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}

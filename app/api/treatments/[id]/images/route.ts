@@ -73,12 +73,29 @@ export async function POST(
       );
     }
 
-    // ファイル形式チェック
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
+    // ファイル形式チェック（iOS HEIC/HEIF対応）
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ];
+
+    // ファイル拡張子からも判定
+    const fileExtension = file.name.toLowerCase().split(".").pop();
+    const allowedExtensions = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+
+    const isValidType =
+      allowedTypes.includes(file.type) ||
+      (fileExtension && allowedExtensions.includes(fileExtension));
+
+    if (!isValidType) {
       return NextResponse.json(
         {
-          error: "JPEG、PNG、WebPファイルのみアップロード可能です",
+          error:
+            "JPEG、PNG、WebP、HEIC/HEIF形式の画像ファイルのみアップロード可能です",
         },
         { status: 400 }
       );
@@ -106,12 +123,18 @@ export async function POST(
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = new Uint8Array(arrayBuffer);
 
+    // HEIC/HEIFファイルの場合、Content-Typeを調整
+    let contentType = file.type;
+    if (fileExtension === "heic" || fileExtension === "heif") {
+      contentType = "image/heic";
+    }
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("treatment-images")
       .upload(fileName, fileBuffer, {
         cacheControl: "3600",
         upsert: false,
-        contentType: file.type,
+        contentType: contentType,
       });
 
     if (uploadError) {

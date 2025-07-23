@@ -9,10 +9,10 @@ SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_che
 FROM pg_policies 
 WHERE schemaname = 'storage' AND tablename = 'objects';
 
--- 3. もしバケットが存在しない場合は作成
+-- 3. もしバケットが存在しない場合は作成（iOS HEIC/HEIF対応）
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('treatment-images', 'treatment-images', true, 10485760, ARRAY['image/jpeg', 'image/png', 'image/webp'])
+VALUES ('treatment-images', 'treatment-images', true, 10485760, ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
 ON CONFLICT (id) DO UPDATE SET 
     public = true,
     file_size_limit = 10485760,
-    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp']; 
+    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']; 
