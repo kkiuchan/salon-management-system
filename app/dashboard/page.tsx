@@ -43,7 +43,6 @@ import {
   Shield,
   Trash2,
   User,
-  Users,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -1592,7 +1591,7 @@ export default function DashboardPage() {
                   顧客QRコード管理
                 </h2>
                 <p className="text-sm text-gray-600">
-                  新規顧客入力ページと既存顧客のQRコードを管理
+                  新規顧客が自分で情報入力するQRコードを管理
                 </p>
               </div>
             </div>
@@ -1674,72 +1673,6 @@ export default function DashboardPage() {
                       </Button>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 既存顧客用QRコード */}
-            <Card>
-              <CardHeader>
-                <CardTitle>既存顧客詳細用QRコード</CardTitle>
-                <CardDescription>
-                  既存顧客の詳細ページへのQRコードを生成
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {paginatedCustomers.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {paginatedCustomers.slice(0, 6).map((customer) => (
-                        <Card key={customer.id} className="p-4">
-                          <div className="text-center">
-                            <div className="bg-white p-2 rounded border inline-block mb-2">
-                              <QRCode
-                                value={`${
-                                  typeof window !== "undefined"
-                                    ? window.location.origin
-                                    : ""
-                                }/customers/${customer.id}`}
-                                size={100}
-                                bgColor="white"
-                                fgColor="black"
-                              />
-                            </div>
-                            <h4 className="font-medium text-sm text-gray-900 truncate">
-                              {customer.name}
-                            </h4>
-                            <p className="text-xs text-gray-500 mb-2">
-                              顧客詳細ページ
-                            </p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handlePrintQR(
-                                  `${
-                                    typeof window !== "undefined"
-                                      ? window.location.origin
-                                      : ""
-                                  }/customers/${customer.id}`,
-                                  `${customer.name}様 詳細情報`,
-                                  "施術履歴や詳細情報を\nご確認いただけます"
-                                )
-                              }
-                              className="w-full"
-                            >
-                              <Printer className="h-3 w-3 mr-1" />
-                              印刷
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">顧客が登録されていません</p>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
