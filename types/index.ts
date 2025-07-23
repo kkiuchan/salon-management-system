@@ -24,3 +24,15 @@ export interface TreatmentWithImages extends Treatment {
 export interface CustomerWithTreatments extends Customer {
   treatments: TreatmentWithImages[];
 }
+
+// 管理者型定義を追加
+export interface Admin {
+  id: string;
+  auth_user_id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
