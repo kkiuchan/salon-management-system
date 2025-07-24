@@ -31,8 +31,10 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Database,
   Download,
   Edit,
+  FileText,
   Filter,
   LogOut,
   Mail,
@@ -88,9 +90,9 @@ export default function DashboardPage() {
   const router = useRouter();
 
   // 新しいタブ管理の状態
-  const [activeTab, setActiveTab] = useState<"customers" | "admins" | "qrcode">(
-    "customers"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "customers" | "admins" | "qrcode" | "export"
+  >("customers");
 
   // 管理者管理の状態
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -143,6 +145,9 @@ export default function DashboardPage() {
     title: "",
     description: "",
   });
+
+  // データエクスポート関連の状態
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   // QRコード印刷機能
   const handlePrintQR = (
@@ -410,7 +415,9 @@ export default function DashboardPage() {
   };
 
   // タブ切り替え時のデータ取得
-  const handleTabChange = (tab: "customers" | "admins" | "qrcode") => {
+  const handleTabChange = (
+    tab: "customers" | "admins" | "qrcode" | "export"
+  ) => {
     setActiveTab(tab);
     if (tab === "admins" && admins.length === 0) {
       fetchAdmins();
@@ -693,6 +700,17 @@ export default function DashboardPage() {
               >
                 <QrCode className="h-4 w-4 inline mr-2" />
                 顧客QRコード
+              </button>
+              <button
+                onClick={() => handleTabChange("export")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "export"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <Download className="h-4 w-4 inline mr-2" />
+                データエクスポート
               </button>
             </nav>
           </div>
@@ -1582,7 +1600,7 @@ export default function DashboardPage() {
               </DialogContent>
             </Dialog>
           </div>
-        ) : (
+        ) : activeTab === "qrcode" ? (
           // 顧客QRコード管理コンテンツ
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1721,7 +1739,278 @@ export default function DashboardPage() {
               </DialogContent>
             </Dialog>
           </div>
-        )}
+        ) : activeTab === "export" ? (
+          // データエクスポート管理コンテンツ
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  データエクスポート
+                </h2>
+                <p className="text-sm text-gray-600">
+                  顧客データ・施術履歴をダウンロードできます
+                </p>
+              </div>
+            </div>
+
+            {/* エクスポートオプション */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 全データエクスポート */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    全データ一括エクスポート
+                  </CardTitle>
+                  <CardDescription>
+                    全顧客・全施術履歴を含む完全なデータセット
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">
+                      含まれるデータ
+                    </h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• 全顧客の基本情報</li>
+                      <li>• 全施術履歴と詳細</li>
+                      <li>• 施術画像のURL</li>
+                      <li>• 作成・更新日時</li>
+                    </ul>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        const url = `/api/export/customers?format=csv`;
+                        window.open(url, "_blank");
+                      }}
+                      className="flex-1"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      CSV形式
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const url = `/api/export/customers?format=json`;
+                        window.open(url, "_blank");
+                      }}
+                      className="flex-1"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      JSON形式
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 個別顧客エクスポート */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    個別顧客エクスポート
+                  </CardTitle>
+                  <CardDescription>
+                    特定の顧客のデータのみをエクスポート
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-900 mb-2">
+                      使用方法
+                    </h4>
+                    <ul className="text-sm text-green-800 space-y-1">
+                      <li>• 顧客管理タブから対象顧客を選択</li>
+                      <li>• 顧客詳細ページでダウンロード</li>
+                      <li>• または下記から顧客を選択</li>
+                    </ul>
+                  </div>
+
+                  {allCustomers.length > 0 ? (
+                    <div>
+                      <Label htmlFor="customer-select">顧客を選択</Label>
+                      <Select
+                        value={selectedCustomerId}
+                        onValueChange={setSelectedCustomerId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="顧客を選択してください" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allCustomers.slice(0, 50).map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {selectedCustomerId && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                          <strong>選択中:</strong>{" "}
+                          {
+                            allCustomers.find(
+                              (c) => c.id === selectedCustomerId
+                            )?.name
+                          }
+                          <br />
+                          <span className="text-gray-600">
+                            施術履歴:{" "}
+                            {allCustomers.find(
+                              (c) => c.id === selectedCustomerId
+                            )?.treatments?.length || 0}
+                            件
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (!selectedCustomerId) {
+                              alert(
+                                "顧客を選択してからダウンロードしてください"
+                              );
+                              return;
+                            }
+                            const url = `/api/export/customers?customer_id=${selectedCustomerId}&format=csv`;
+                            window.open(url, "_blank");
+                          }}
+                          className="flex-1"
+                          disabled={!selectedCustomerId}
+                        >
+                          CSV
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (!selectedCustomerId) {
+                              alert(
+                                "顧客を選択してからダウンロードしてください"
+                              );
+                              return;
+                            }
+                            const url = `/api/export/customers?customer_id=${selectedCustomerId}&format=json`;
+                            window.open(url, "_blank");
+                          }}
+                          className="flex-1"
+                          disabled={!selectedCustomerId}
+                        >
+                          JSON
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      顧客データがありません
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* エクスポートに関する注意事項 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">重要なお知らせ</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-medium text-amber-900 mb-2">
+                    データエクスポートについて
+                  </h4>
+                  <ul className="text-sm text-amber-800 space-y-1">
+                    <li>
+                      • <strong>CSV形式:</strong>{" "}
+                      Excel等の表計算ソフトで開けます
+                    </li>
+                    <li>
+                      • <strong>JSON形式:</strong>{" "}
+                      他システムへの移行に適しています
+                    </li>
+                    <li>
+                      • <strong>画像ファイル:</strong>{" "}
+                      URLのみ記録されます（実際の画像は別途保存が必要）
+                    </li>
+                    <li>
+                      • <strong>個人情報:</strong>{" "}
+                      適切に管理し、不要になったら削除してください
+                    </li>
+                    <li>
+                      • <strong>バックアップ推奨:</strong>{" "}
+                      定期的なエクスポートをおすすめします
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* データ利用統計 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>データ統計</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {allCustomers.length}
+                    </div>
+                    <div className="text-sm text-gray-600">総顧客数</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {allCustomers.reduce(
+                        (total, customer) =>
+                          total + (customer.treatments?.length || 0),
+                        0
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600">総施術数</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {allCustomers.reduce(
+                        (total, customer) =>
+                          total +
+                          (customer.treatments?.reduce(
+                            (imgTotal, treatment) =>
+                              imgTotal +
+                              (treatment.treatment_images?.length || 0),
+                            0
+                          ) || 0),
+                        0
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600">総画像数</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {Math.round(
+                        allCustomers.reduce(
+                          (total, customer) =>
+                            total +
+                            (customer.treatments?.reduce(
+                              (priceTotal, treatment) =>
+                                priceTotal + (treatment.price || 0),
+                              0
+                            ) || 0),
+                          0
+                        )
+                      ).toLocaleString()}
+                      円
+                    </div>
+                    <div className="text-sm text-gray-600">総売上</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         {/* 管理者移行ダイアログ */}
         <Dialog open={showMigrationDialog} onOpenChange={() => {}}>

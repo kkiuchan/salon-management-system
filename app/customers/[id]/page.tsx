@@ -37,7 +37,9 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
+  Download,
   Edit,
+  FileText,
   Mail,
   Phone,
   Plus,
@@ -445,137 +447,209 @@ export default function CustomerDetailPage() {
                         `${formatDate(customer.date_of_birth)}生まれ`}
                     </CardDescription>
                   </div>
-                  <Dialog
-                    open={isEditDialogOpen}
-                    onOpenChange={setIsEditDialogOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>顧客情報編集</DialogTitle>
-                        <DialogDescription>
-                          顧客の情報を更新してください
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleEditCustomer} className="space-y-4">
-                        <div>
-                          <Label htmlFor="edit-name">名前 *</Label>
-                          <Input
-                            id="edit-name"
-                            value={editCustomer.name}
-                            onChange={(e) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                name: e.target.value,
-                              })
-                            }
-                            required
-                          />
+                  <div className="flex gap-2">
+                    {/* データエクスポートボタン */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="データエクスポート"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {customer.name}様のデータエクスポート
+                          </DialogTitle>
+                          <DialogDescription>
+                            この顧客のデータをダウンロードします
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-medium text-blue-900 mb-2">
+                              エクスポート内容
+                            </h4>
+                            <ul className="text-sm text-blue-800 space-y-1">
+                              <li>• 顧客基本情報</li>
+                              <li>
+                                • 施術履歴 ({customer.treatments?.length || 0}
+                                件)
+                              </li>
+                              <li>• 施術画像URL</li>
+                              <li>• 作成・更新日時</li>
+                            </ul>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => {
+                                const url = `/api/export/customers?customer_id=${customer.id}&format=csv`;
+                                window.open(url, "_blank");
+                              }}
+                              className="flex-1"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              CSV形式
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                const url = `/api/export/customers?customer_id=${customer.id}&format=json`;
+                                window.open(url, "_blank");
+                              }}
+                              className="flex-1"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              JSON形式
+                            </Button>
+                          </div>
                         </div>
+                      </DialogContent>
+                    </Dialog>
 
-                        <div>
-                          <Label htmlFor="edit-gender">性別</Label>
-                          <Select
-                            value={editCustomer.gender}
-                            onValueChange={(value) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                gender: value,
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="性別を選択" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="男性">男性</SelectItem>
-                              <SelectItem value="女性">女性</SelectItem>
-                              <SelectItem value="その他">その他</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                    {/* 編集ボタン */}
+                    <Dialog
+                      open={isEditDialogOpen}
+                      onOpenChange={setIsEditDialogOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="顧客情報編集"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>顧客情報編集</DialogTitle>
+                          <DialogDescription>
+                            顧客の情報を更新してください
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form
+                          onSubmit={handleEditCustomer}
+                          className="space-y-4"
+                        >
+                          <div>
+                            <Label htmlFor="edit-name">名前 *</Label>
+                            <Input
+                              id="edit-name"
+                              value={editCustomer.name}
+                              onChange={(e) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  name: e.target.value,
+                                })
+                              }
+                              required
+                            />
+                          </div>
 
-                        <div>
-                          <Label htmlFor="edit-date_of_birth">生年月日</Label>
-                          <Input
-                            id="edit-date_of_birth"
-                            type="date"
-                            value={editCustomer.date_of_birth}
-                            onChange={(e) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                date_of_birth: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                          <div>
+                            <Label htmlFor="edit-gender">性別</Label>
+                            <Select
+                              value={editCustomer.gender}
+                              onValueChange={(value) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  gender: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="性別を選択" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="男性">男性</SelectItem>
+                                <SelectItem value="女性">女性</SelectItem>
+                                <SelectItem value="その他">その他</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                        <div>
-                          <Label htmlFor="edit-phone">電話番号</Label>
-                          <Input
-                            id="edit-phone"
-                            value={editCustomer.phone}
-                            onChange={(e) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                phone: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                          <div>
+                            <Label htmlFor="edit-date_of_birth">生年月日</Label>
+                            <Input
+                              id="edit-date_of_birth"
+                              type="date"
+                              value={editCustomer.date_of_birth}
+                              onChange={(e) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  date_of_birth: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
 
-                        <div>
-                          <Label htmlFor="edit-email">メールアドレス</Label>
-                          <Input
-                            id="edit-email"
-                            type="email"
-                            value={editCustomer.email}
-                            onChange={(e) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                email: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                          <div>
+                            <Label htmlFor="edit-phone">電話番号</Label>
+                            <Input
+                              id="edit-phone"
+                              value={editCustomer.phone}
+                              onChange={(e) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  phone: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
 
-                        <div>
-                          <Label htmlFor="edit-notes">備考</Label>
-                          <Textarea
-                            id="edit-notes"
-                            value={editCustomer.notes}
-                            onChange={(e) =>
-                              setEditCustomer({
-                                ...editCustomer,
-                                notes: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                          <div>
+                            <Label htmlFor="edit-email">メールアドレス</Label>
+                            <Input
+                              id="edit-email"
+                              type="email"
+                              value={editCustomer.email}
+                              onChange={(e) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  email: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
 
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            disabled={submitting}
-                            className="flex-1"
-                          >
-                            {submitting ? "更新中..." : "更新"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsEditDialogOpen(false)}
-                          >
-                            キャンセル
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                          <div>
+                            <Label htmlFor="edit-notes">備考</Label>
+                            <Textarea
+                              id="edit-notes"
+                              value={editCustomer.notes}
+                              onChange={(e) =>
+                                setEditCustomer({
+                                  ...editCustomer,
+                                  notes: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              type="submit"
+                              disabled={submitting}
+                              className="flex-1"
+                            >
+                              {submitting ? "更新中..." : "更新"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsEditDialogOpen(false)}
+                            >
+                              キャンセル
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
