@@ -667,50 +667,54 @@ export default function DashboardPage() {
 
           {/* タブナビゲーション */}
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex space-x-4 sm:space-x-8">
               <button
                 onClick={() => handleTabChange("customers")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center justify-center sm:justify-start min-w-[44px] ${
                   activeTab === "customers"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
+                title="顧客管理"
               >
-                <User className="h-4 w-4 inline mr-2" />
-                顧客管理
+                <User className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">顧客管理</span>
               </button>
               <button
                 onClick={() => handleTabChange("admins")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center justify-center sm:justify-start min-w-[44px] ${
                   activeTab === "admins"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
+                title="管理者管理"
               >
-                <Shield className="h-4 w-4 inline mr-2" />
-                管理者管理
+                <Shield className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">管理者管理</span>
               </button>
               <button
                 onClick={() => handleTabChange("qrcode")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center justify-center sm:justify-start min-w-[44px] ${
                   activeTab === "qrcode"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
+                title="顧客QRコード"
               >
-                <QrCode className="h-4 w-4 inline mr-2" />
-                顧客QRコード
+                <QrCode className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">顧客QRコード</span>
               </button>
               <button
                 onClick={() => handleTabChange("export")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center justify-center sm:justify-start min-w-[44px] ${
                   activeTab === "export"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
+                title="データエクスポート"
               >
-                <Download className="h-4 w-4 inline mr-2" />
-                データエクスポート
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">データエクスポート</span>
               </button>
             </nav>
           </div>
