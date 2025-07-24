@@ -24,6 +24,10 @@ CREATE POLICY "Admins can view all admins" ON public.admins
 
 CREATE POLICY "Admins can insert new admins" ON public.admins
     FOR INSERT WITH CHECK (
+        -- 管理者テーブルが空の場合は、認証されたユーザーなら誰でも追加可能（最初の管理者）
+        (NOT EXISTS (SELECT 1 FROM public.admins) AND auth.uid() IS NOT NULL)
+        OR
+        -- 既存の管理者が新しい管理者を追加
         EXISTS (
             SELECT 1 FROM public.admins 
             WHERE auth_user_id = auth.uid() AND is_active = true
